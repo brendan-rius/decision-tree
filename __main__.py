@@ -31,7 +31,7 @@ class Node:
         return entropy_of_vector(probability_vector)
 
     def generate_children_for_feature(self, feature):
-        children = []
+        children = {}
         for outcome in feature.outcomes:  # For each possible outcome of the feature
             outcome_x = []
             outcome_y = []
@@ -42,7 +42,7 @@ class Node:
                     outcome_x.append(training_example_features)
                     outcome_y.append(training_example_label)
             outcome_node = Node(outcome_x, outcome_y)
-            children.append(outcome_node)
+            children[outcome] = outcome_node
         return children
 
     def choose_best_feature(self, available_features_indices):
@@ -59,7 +59,7 @@ class Node:
         features_gain = {}
         for feature in features:
             children = self.generate_children_for_feature(feature)
-            gain = self.information_gain(children)
+            gain = self.information_gain(children.values())
             features_gain[feature] = gain
         return max(features_gain.items(), key=operator.itemgetter(1))[0]
 
@@ -67,6 +67,17 @@ class Node:
         entropy = self.entropy()
         children_weighted_entropy = sum([(len(child.x) / len(self.x)) * child.entropy() for child in children])
         return entropy - children_weighted_entropy
+
+    def walk(self, features_vector):
+        if self.is_leaf:
+            return self.label
+        elif not self.feature:
+            raise RuntimeError("This node is not a splitting node")
+        elif features_vector[self.feature.feature_index] not in self.feature.outcomes:
+            raise RuntimeError("The feature vector contains a value that is not known in the tree")
+        else:
+            node_for_outcome = self.children[features_vector[self.feature.feature_index]]
+            return node_for_outcome.walk(features_vector)
 
     @property
     def label(self):
@@ -116,14 +127,16 @@ class DecisionTree:
             self.available_features -= set([best_feature.feature_index])
             node.children = node.generate_children_for_feature(best_feature)
             node.feature = best_feature
-            for child in node.children:
+            for child in node.children.values():
                 expand_node_breadth_first(child, current_depth + 1)
 
         expand_node_breadth_first(root, 0)
         self.tree = root
 
     def predict(self, x):
-        pass
+        if not self.tree:
+            raise RuntimeError("Please train the tree first")
+        return self.tree.walk(x)
 
 
 if __name__ == '__main__':
@@ -159,4 +172,4 @@ if __name__ == '__main__':
         "B",
     ]
     clf.fit(x, y)  # "Learning" step
-    pass
+    print(clf.predict([1, 2, 5, 1, 2, 3]))
