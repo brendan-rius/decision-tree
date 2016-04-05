@@ -67,6 +67,13 @@ class Node:
         children_weighted_entropy = sum([(len(child.x) / len(self.x)) * child.entropy() for child in children])
         return entropy - children_weighted_entropy
 
+    def is_leaf(self):
+        """
+        Return true if this is a leaf node ((if the node has a dataset of maximum 1 element, or if all the elements
+        have the same label
+        """
+        return len(self.y) <= 1 or self.y.count(self.y[0]) == len(self.y)
+
 
 class Feature:
     def __init__(self, feature_index):
@@ -78,18 +85,26 @@ class Feature:
 
 
 class DecisionTree:
-    def __init__(self):
+    def __init__(self, max_depth=10):
         self.tree = None
         self.available_features = None
+        self.max_depth = max_depth
 
     def fit(self, x, y):
         self.available_features = set(range(len(x[0])))
         root = Node(x, y)  # We create the root node containing all the data
-        node = root
-        best_feature = node.choose_best_feature(self.available_features)
-        self.available_features -= set([best_feature.feature_index])
-        node.children = node.generate_children_for_feature(best_feature)
-        pass
+
+        def expand_node_breadth_first(node, current_depth):
+            if node.is_leaf() or current_depth >= self.max_depth:
+                return
+            best_feature = node.choose_best_feature(self.available_features)
+            self.available_features -= set([best_feature.feature_index])
+            node.children = node.generate_children_for_feature(best_feature)
+            for child in node.children:
+                expand_node_breadth_first(child, current_depth + 1)
+
+        expand_node_breadth_first(root, 0)
+        self.tree = root
 
     def predict(self, x):
         pass
@@ -101,14 +116,14 @@ if __name__ == '__main__':
     x = [
         [1, 2, 3, 1, 2, 1],
         [1, 4, 3, 1, 2, 3],
-        [5, 1, 3, 3, 2, 1],
+        [5, 1, 3, 3, 2, 5],
         [1, 2, 3, 1, 3, 1],
         [1, 2, 3, 1, 2, 3],
         [1, 2, 5, 1, 5, 1],
         [5, 2, 8, 5, 2, 5],
         [5, 4, 8, 5, 2, 8],
         [5, 5, 8, 8, 2, 5],
-        [5, 2, 8, 5, 8, 5],
+        [5, 2, 8, 3, 8, 5],
         [5, 2, 8, 5, 2, 8],
         [5, 2, 5, 5, 5, 5],
     ]
@@ -128,3 +143,4 @@ if __name__ == '__main__':
         "B",
     ]
     clf.fit(x, y)  # "Learning" step
+    pass
