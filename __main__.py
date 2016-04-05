@@ -110,7 +110,7 @@ class Feature:
         self.outcomes.add(outcome)
 
 
-class DecisionTree:
+class DecisionTreeClassifier:
     def __init__(self, max_depth=10):
         self.tree = None
         self.available_features = None
@@ -140,7 +140,7 @@ class DecisionTree:
 
 
 if __name__ == '__main__':
-    clf = DecisionTree()
+    clf = DecisionTreeClassifier()
     # Training feature vectors
     x = [
         [1, 2, 3, 1, 2, 1],
