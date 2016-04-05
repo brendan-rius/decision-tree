@@ -8,6 +8,7 @@ class Node:
         self.x = x
         self.y = y
         self.children = []
+        self.feature = None
 
     def entropy(self):
         def entropy_of_vector(vector):
@@ -114,6 +115,7 @@ class DecisionTree:
             best_feature = node.choose_best_feature(self.available_features)
             self.available_features -= set([best_feature.feature_index])
             node.children = node.generate_children_for_feature(best_feature)
+            node.feature = best_feature
             for child in node.children:
                 expand_node_breadth_first(child, current_depth + 1)
 
