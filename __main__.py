@@ -67,12 +67,26 @@ class Node:
         children_weighted_entropy = sum([(len(child.x) / len(self.x)) * child.entropy() for child in children])
         return entropy - children_weighted_entropy
 
+    @property
+    def label(self):
+        """
+        Returns the label of a root node. The root node can either be made of a unique label, or different labels (if
+        the max depth is reached while building the tree for example).
+        We return the most present label.
+        """
+        if not self.is_leaf:
+            raise RuntimeError("Cannot determine the label of a non-leaf node")
+        else:
+            counter = Counter(self.y)
+            return counter.most_common(1)[0][0]
+
+    @property
     def is_leaf(self):
         """
-        Return true if this is a leaf node ((if the node has a dataset of maximum 1 element, or if all the elements
+        Return true if this is a leaf node ((if the node has a dataset of 1 element, or if all the elements
         have the same label
         """
-        return len(self.y) <= 1 or self.y.count(self.y[0]) == len(self.y)
+        return len(self.y) == 1 or self.y.count(self.y[0]) == len(self.y)
 
 
 class Feature:
@@ -95,7 +109,7 @@ class DecisionTree:
         root = Node(x, y)  # We create the root node containing all the data
 
         def expand_node_breadth_first(node, current_depth):
-            if node.is_leaf() or current_depth >= self.max_depth:
+            if node.is_leaf or current_depth >= self.max_depth:
                 return
             best_feature = node.choose_best_feature(self.available_features)
             self.available_features -= set([best_feature.feature_index])
