@@ -1,5 +1,6 @@
 import math
 from collections import Counter, deque
+import pygraphviz
 
 
 class Node:
@@ -214,6 +215,19 @@ class DecisionTreeClassifier:
 
         self.tree = root
 
+    def to_dot(self):
+        graph = pygraphviz.AGraph(directed=True, strict=True)
+
+        def iterate(node):
+            if not node.is_leaf:
+                for child in node.children:
+                    graph.add_edge(node.feature.feature_index, child.feature.feature_index)
+                    iterate(child)
+
+        iterate(self.tree)
+
+        graph.write('ademo.dot')
+
     def predict(self, x):
         """
         Predict the label of a features vector x
@@ -276,4 +290,5 @@ if __name__ == '__main__':
         "B",
     ]
     clf.fit(x, y)  # "Learning" step
+    clf.to_dot()
     print(clf.predict([1, 2, 5, 1, 2, 3]))
