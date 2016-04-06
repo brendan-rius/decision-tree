@@ -1,6 +1,7 @@
 import math
 import operator
 from collections import Counter
+from queue import Queue
 
 
 class Node:
@@ -71,8 +72,6 @@ class Node:
     def walk(self, features_vector):
         if self.is_leaf:
             return self.label
-        elif not self.feature:
-            raise RuntimeError("This node is not a splitting node")
         elif features_vector[self.feature.feature_index] not in self.feature.outcomes:
             raise RuntimeError("The feature vector contains a value that is not known in the tree")
         else:
@@ -120,17 +119,20 @@ class DecisionTreeClassifier:
         self.available_features = set(range(len(x[0])))
         root = Node(x, y)  # We create the root node containing all the data
 
-        def expand_node_breadth_first(node, current_depth):
+        queue = Queue()
+        queue.put((root, 0))
+        while not queue.empty():
+            node, current_depth = queue.get_nowait()
             if node.is_leaf or current_depth >= self.max_depth:
-                return
+                break
             best_feature = node.choose_best_feature(self.available_features)
             self.available_features -= set([best_feature.feature_index])
             node.children = node.generate_children_for_feature(best_feature)
             node.feature = best_feature
+            queue.task_done()
             for child in node.children.values():
-                expand_node_breadth_first(child, current_depth + 1)
-
-        expand_node_breadth_first(root, 0)
+                if not child.is_leaf:
+                    queue.put_nowait((child, current_depth + 1))
         self.tree = root
 
     def predict(self, x):
