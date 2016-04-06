@@ -143,22 +143,28 @@ class Node:
 
 
 class Feature:
-    def __init__(self, feature_index):
+    def __init__(self, feature_index, outcomes):
+        """
+        Create a feature based on the n-th component of a features-vector
+        :param feature_index: n
+        """
         self.feature_index = feature_index
-        self.outcomes = set()
-
-    def add_outcome(self, outcome):
-        self.outcomes.add(outcome)
+        self.outcomes = outcomes
 
     @classmethod
-    def build_features_from_dataset(cls, x, y):
+    def build_features_from_dataset(cls, x):
+        """
+        Build a list of features from a dataset
+        :param x: the features vector of the dataset
+        :return: a list of features from this dataset
+        """
         features = set()
         features_indices = range(len(x[0]))
         for feature_index in features_indices:
-            feature = Feature(feature_index)
+            outcomes = set()
             for training_example in x:
-                feature.add_outcome(training_example[feature_index])
-            features.add(feature)
+                outcomes.add(training_example[feature_index])
+            features.add(Feature(feature_index, outcomes))
         return features
 
     def extract(self, vector):
@@ -171,6 +177,10 @@ class Feature:
 
 class DecisionTreeClassifier:
     def __init__(self, max_depth=10):
+        """
+        Create a decision tree classifier
+        :param max_depth: the maximum depth of the tree
+        """
         self.tree = None
         self.max_depth = max_depth
 
@@ -182,7 +192,7 @@ class DecisionTreeClassifier:
         """
 
         # We build all of the possible features for the training examples
-        available_features = Feature.build_features_from_dataset(x, y)
+        available_features = Feature.build_features_from_dataset(x)
 
         # We create the root node containing all the data
         root = Node(x, y)
@@ -198,7 +208,9 @@ class DecisionTreeClassifier:
                 node.assign_children(node.generate_children_for_feature(best_feature))
                 node.feature = best_feature
                 for child in node.children.values():
-                    queue.append((child, available_features.copy() - set([best_feature])))
+                    # The child cannot use one of its parents' feature
+                    available_features_for_child = available_features - {best_feature}
+                    queue.append((child, available_features_for_child))
 
         self.tree = root
 
