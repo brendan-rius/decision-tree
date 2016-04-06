@@ -112,7 +112,7 @@ class Node:
         :param children: the list of children
         """
         self.children = children
-        for child in self.children:
+        for child in self.children.values():
             child.depth = self.depth + 1
 
     @property
@@ -132,7 +132,7 @@ class Node:
         Check whether the node is splittable or not.
         The node is splittable only if it contains more than one element and if it contains different labels.
         """
-        return len(self.y) >= 1 or self.y.count(self.y[0]) != len(self.y)
+        return 1 <= len(self.y) != self.y.count(self.y[0])
 
     @property
     def is_leaf(self):
@@ -203,7 +203,7 @@ class DecisionTreeClassifier:
         queue = deque([(root, available_features)])
         while len(queue) > 0:
             node, current_depth = queue.pop()
-            if node.splittable and node.depth >= self.max_depth:
+            if node.splittable and node.depth < self.max_depth:
                 best_feature = node.choose_best_feature(available_features)
                 node.assign_children(node.generate_children_for_feature(best_feature))
                 node.feature = best_feature
@@ -238,7 +238,7 @@ class DecisionTreeClassifier:
             else:
                 # We get the children node corresponding to the outcome, and we continue walking from there
                 node_for_outcome = node.children[node.feature.extract(x)]
-                return node_for_outcome.walk(x)
+                return walk(node_for_outcome, x)
 
         return walk(self.tree, x)
 
