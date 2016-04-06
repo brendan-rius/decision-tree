@@ -16,6 +16,7 @@ class Node:
         self.children = []  # The children of the node
         self.feature = None  # The feature on which the node splits into children
         self.depth = depth
+        self.parent = None
 
     def entropy(self):
         """
@@ -72,7 +73,7 @@ class Node:
             # For each training example of the node
             for training_example_features, training_example_label in zip(self.x, self.y):
                 # If the the example has the same outcome, we add it to the child node
-                if outcome == training_example_features[feature.feature_index]:
+                if outcome == feature.extract(training_example_features):
                     outcome_x.append(training_example_features)
                     outcome_y.append(training_example_label)
             outcome_node = Node(outcome_x, outcome_y)
@@ -115,6 +116,7 @@ class Node:
         self.children = children
         for child in self.children.values():
             child.depth = self.depth + 1
+            child.parent = self
 
     @property
     def label(self):
@@ -122,7 +124,7 @@ class Node:
         Return the most common label in the node's dataset.
         """
         if not self.y:
-            raise RuntimeError("The node has an empty dataset")  # Should not happen
+            return self.parent.label
         else:
             counter = Counter(self.y)
             return counter.most_common(1)[0][0]
