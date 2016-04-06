@@ -144,6 +144,16 @@ class Node:
         """
         return len(self.children) == 0
 
+    def __str__(self):
+        datapoints = len(self.y)
+        number_different_labels = len(set(self.y))
+        if self.is_leaf:
+            return "Leaf\n{} data points\n{} different labels".format(datapoints, number_different_labels)
+        else:
+            return "Split on feature #{}\n{} data points\n{} different labels".format(self.feature.feature_index,
+                                                                                      datapoints,
+                                                                                      number_different_labels)
+
 
 class Feature:
     def __init__(self, feature_index, outcomes):
