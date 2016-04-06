@@ -1,17 +1,28 @@
 import math
-import operator
-from collections import Counter
-from queue import Queue
+from collections import Counter, deque
 
 
 class Node:
-    def __init__(self, x, y):
+    def __init__(self, x, y, depth=0):
+        """
+        Create a node containing a dataset made of feature vectors (x) and their corresponding labels (y)
+        :param x: the feature vectors of the training examples
+        :param y: the labels of the training examples
+        :param depth: the depth of the node
+        """
         self.x = x
         self.y = y
-        self.children = []
-        self.feature = None
+        self.children = []  # The children of the node
+        self.feature = None  # The feature on which the node splits into children
+        self.depth = depth
 
     def entropy(self):
+        """
+        Compute the entropy log2 of the dataset of the node, based on their labels.
+        This can vary between 0 (all labels are the same) to 1 (labels are different and equally distributed)
+        :return: the entropy
+        """
+
         def entropy_of_vector(vector):
             """
             Compute the entropy of a probability vector
@@ -24,14 +35,35 @@ class Node:
                     entropy += p * math.log2(p)
             return -entropy
 
-        counter = Counter()
-        for training_example_label in self.y:
-            counter.update(training_example_label)
-        len_dataset = float(len(self.x))
-        probability_vector = [count / len_dataset for count in counter.values()]
-        return entropy_of_vector(probability_vector)
+        def construct_probability_vector():
+            """
+            Compute the frequency of each label in the dataset and put it in a vector.
+            :return:
+            """
+            # We count the labels
+            counter = Counter()
+            for label in self.y:
+                counter.update(label)
+
+            # We divide the count of each label by the total number of data points in the set
+            len_dataset = float(len(self.x))
+            probability_vector = [count / len_dataset for count in counter.values()]
+
+            return probability_vector
+
+        return entropy_of_vector(construct_probability_vector())
 
     def generate_children_for_feature(self, feature):
+        """
+        Create children for the node based on a certain feature to split on.
+        This does not add children to the nodes, it only returns them.
+        This will generate one child for each outcome of the feature.
+        For example, if you have a feature "color" that can contain 1 for blue, 2 for red, 3 for black (feature
+        outcomes), thi will create three children node containing the corresponding correct dataset (one with only the
+        blue, the other one with only the red, and the other one with only the black)
+        :param feature: the feature to split on.
+        :return: a dictionary with keys being the feature's outcomes and the values being the associated node.
+        """
         children = {}
         for outcome in feature.outcomes:  # For each possible outcome of the feature
             outcome_x = []
@@ -46,58 +78,68 @@ class Node:
             children[outcome] = outcome_node
         return children
 
-    def choose_best_feature(self, available_features_indices):
-        def build_possible_features():
-            features = []
-            for feature_index in available_features_indices:
-                feature = Feature(feature_index)
-                for training_example in self.x:
-                    feature.add_outcome(training_example[feature_index])
-                features.append(feature)
-            return features
+    def choose_best_feature(self, features):
+        """
+        Choose the best feature to split the current node on in a set of features.
+        We choose the feature that maximizes the information gain.
+        :param features: the set of feature to choose from
+        :return: the best feature (based on the information gain) to split on
+        """
 
-        features = build_possible_features()
-        features_gain = {}
+        if len(features) == 0:
+            raise RuntimeError("There is no feature to choose from")
+
+        best_feature = (None, None)  # (feature, information_gain)
         for feature in features:
             children = self.generate_children_for_feature(feature)
             gain = self.information_gain(children.values())
-            features_gain[feature] = gain
-        return max(features_gain.items(), key=operator.itemgetter(1))[0]
+            if best_feature[1] is None or gain > best_feature[1]:
+                best_feature = (feature, gain)
+        return best_feature[0]
 
     def information_gain(self, children):
+        """
+        Compute the information gain that would occur we use a set of nodes as children nodes.
+        :param children: the children nodes
+        """
         entropy = self.entropy()
         children_weighted_entropy = sum([(len(child.x) / len(self.x)) * child.entropy() for child in children])
         return entropy - children_weighted_entropy
 
-    def walk(self, features_vector):
-        if self.is_leaf:
-            return self.label
-        elif features_vector[self.feature.feature_index] not in self.feature.outcomes:
-            raise RuntimeError("The feature vector contains a value that is not known in the tree")
-        else:
-            node_for_outcome = self.children[features_vector[self.feature.feature_index]]
-            return node_for_outcome.walk(features_vector)
+    def assign_children(self, children):
+        """
+        Assign children to the node and automatically set their depth
+        :param children: the list of children
+        """
+        self.children = children
+        for child in self.children:
+            child.depth = self.depth + 1
 
     @property
     def label(self):
         """
-        Returns the label of a root node. The root node can either be made of a unique label, or different labels (if
-        the max depth is reached while building the tree for example).
-        We return the most present label.
+        Return the most common label in the node's dataset.
         """
-        if not self.is_leaf:
-            raise RuntimeError("Cannot determine the label of a non-leaf node")
+        if not self.y:
+            raise RuntimeError("The node has an empty dataset")  # Should not happen
         else:
             counter = Counter(self.y)
             return counter.most_common(1)[0][0]
 
     @property
+    def splittable(self):
+        """
+        Check whether the node is splittable or not.
+        The node is splittable only if it contains more than one element and if it contains different labels.
+        """
+        return len(self.y) >= 1 or self.y.count(self.y[0]) != len(self.y)
+
+    @property
     def is_leaf(self):
         """
-        Return true if this is a leaf node ((if the node has a dataset of 1 element, or if all the elements
-        have the same label
+        Check whether the node has children or not
         """
-        return len(self.y) == 1 or self.y.count(self.y[0]) == len(self.y)
+        return len(self.children) == 0
 
 
 class Feature:
@@ -108,37 +150,85 @@ class Feature:
     def add_outcome(self, outcome):
         self.outcomes.add(outcome)
 
+    @classmethod
+    def build_features_from_dataset(cls, x, y):
+        features = set()
+        features_indices = range(len(x[0]))
+        for feature_index in features_indices:
+            feature = Feature(feature_index)
+            for training_example in x:
+                feature.add_outcome(training_example[feature_index])
+            features.add(feature)
+        return features
+
+    def extract(self, vector):
+        """
+        Extract this feature value in a features vector
+        :param vector: the features vector
+        """
+        return vector[self.feature_index]
+
 
 class DecisionTreeClassifier:
     def __init__(self, max_depth=10):
         self.tree = None
-        self.available_features = None
         self.max_depth = max_depth
 
     def fit(self, x, y):
-        self.available_features = set(range(len(x[0])))
-        root = Node(x, y)  # We create the root node containing all the data
+        """
+        Builds the tree from training data
+        :param x: the features vectors of the data
+        :param y: the corresponding labels
+        """
 
-        queue = Queue()
-        queue.put((root, 0))
-        while not queue.empty():
-            node, current_depth = queue.get_nowait()
-            if node.is_leaf or current_depth >= self.max_depth:
-                break
-            best_feature = node.choose_best_feature(self.available_features)
-            self.available_features -= set([best_feature.feature_index])
-            node.children = node.generate_children_for_feature(best_feature)
-            node.feature = best_feature
-            queue.task_done()
-            for child in node.children.values():
-                if not child.is_leaf:
-                    queue.put_nowait((child, current_depth + 1))
+        # We build all of the possible features for the training examples
+        available_features = Feature.build_features_from_dataset(x, y)
+
+        # We create the root node containing all the data
+        root = Node(x, y)
+
+        # We create the queue, because we will construct the tree breadth-first.
+        # This queue contains the nodes that need to be expanded (the ones we need to find children for).
+        # Each element of the queue if a tuple (node, available_features)
+        queue = deque([(root, available_features)])
+        while len(queue) > 0:
+            node, current_depth = queue.pop()
+            if node.splittable and node.depth >= self.max_depth:
+                best_feature = node.choose_best_feature(available_features)
+                node.assign_children(node.generate_children_for_feature(best_feature))
+                node.feature = best_feature
+                for child in node.children.values():
+                    queue.append((child, available_features.copy() - set([best_feature])))
+
         self.tree = root
 
     def predict(self, x):
+        """
+        Predict the label of a features vector x
+        :param x: the features vector x
+        :return: the predicted label
+        """
         if not self.tree:
             raise RuntimeError("Please train the tree first")
-        return self.tree.walk(x)
+
+        def walk(node, x):
+            """
+            Walk in the node until the node is a leaf. Then returns the corresponding label.
+            :param node: the node to start with
+            :param x: the features vector for which you want to predict the value.
+            """
+            if node.is_leaf:
+                return node.label
+            # This is a limitation of the actual code: you can only predict when all the features have already
+            # been seen in the training set.
+            elif node.feature.extract(x) not in node.feature.outcomes:
+                raise RuntimeError("The feature vector contains a value that is not known in the tree")
+            else:
+                # We get the children node corresponding to the outcome, and we continue walking from there
+                node_for_outcome = node.children[node.feature.extract(x)]
+                return node_for_outcome.walk(x)
+
+        return walk(self.tree, x)
 
 
 if __name__ == '__main__':
