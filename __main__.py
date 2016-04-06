@@ -232,8 +232,8 @@ class DecisionTreeClassifier:
 
         def iterate(node):
             if not node.is_leaf:
-                for child in node.children:
-                    graph.add_edge(node.feature.feature_index, child.feature.feature_index)
+                for child in node.children.values():
+                    graph.add_edge(node, child)
                     iterate(child)
 
         iterate(self.tree)
